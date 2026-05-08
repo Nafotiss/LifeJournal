@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cosmic Journal - Space Timeline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    overflow: hidden;
+    background: #000;
+    font-family: 'Inter', sans-serif;
+    color: #e0e0e0;
+    user-select: none;
+  }
+
+  #canvas3d {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+  }
+
+  /* Top bar */
+  .top-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 20px 30px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%);
+  }
+
+  .settings-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(20px);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+  }
+
+  .settings-btn:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.3);
+    transform: rotate(45deg);
+  }
+
+  .settings-btn svg {
+    width: 22px;
+    height: 22px;
+    stroke: #ccc;
+    fill: none;
+    stroke-width: 1.8;
+  }
+
+  /* Date display */
+  .date-display {
+    position: fixed;
+    top: 24px;
+    left: 30px;
+    z-index: 100;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    letter-spacing: 2px;
+  }
+
+  .date-display .year {
+    font-size: 32px;
+    color: rgba(255,255,255,0.85);
+    font-weight: 700;
+    letter-spacing: 4px;
+    display: block;
+    margin-top: 4px;
+  }
+
+  /* Settings Panel */
+  .settings-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .settings-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .settings-panel {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 340px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    z-index: 201;
+    background: rgba(15, 15, 25, 0.92);
+    backdrop-filter: blur(40px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 28px;
+    transform: translateX(400px);
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .settings-panel.active {
+    transform: translateX(0);
+  }
+
+  .settings-panel::-webkit-scrollbar { width: 4px; }
+  .settings-panel::-webkit-scrollbar-track { background: transparent; }
+  .settings-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+  .settings-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .settings-title svg {
+    width: 20px; height: 20px;
+    stroke: #aaa; fill: none; stroke-width: 1.8;
+  }
+
+  .setting-group {
+    margin-bottom: 22px;
+  }
+
+  .setting-group label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.45);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+
+  .dob-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    color: #fff;
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.3s;
+  }
+
+  .dob-input:focus {
+    border-color: rgba(100, 140, 255, 0.5);
+  }
+
+  .dob-input::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+  }
+
+  .size-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .size-control input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    outline: none;
+  }
+
+  .size-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(255,255,255,0.3);
+  }
+
+  .size-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  .toggle-label {
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+  }
+
+  .toggle-switch {
+    width: 44px;
+    height: 24px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.3s;
+    border: none;
+    outline: none;
+  }
+
+  .toggle-switch.active {
+    background: rgba(80, 120, 255, 0.6);
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .toggle-switch.active::after {
+    transform: translateX(20px);
+  }
+
+  .divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 18px 0;
+  }
+
+  /* Journal Panel */
+  .journal-overlay {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 150;
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .journal-panel {
+    width: 600px;
+    max-width: 90vw;
+    max-height: 70vh;
+    background: rgba(12, 12, 22, 0.95);
+    backdrop-filter: blur(40px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-bottom: none;
+    border-radius: 24px 24px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: all;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .journal-panel.active {
+    transform: translateY(0);
+  }
+
+  .journal-header {
+    padding: 24px 28px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .journal-date {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+  }
+
+  .journal-year-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 4px 12px;
+    background: rgba(100, 140, 255, 0.15);
+    border: 1px solid rgba(100, 140, 255, 0.25);
+    border-radius: 20px;
+    color: rgba(140, 170, 255, 0.9);
+  }
+
+  .journal-input-area {
+    flex: 1;
+    padding: 20px 28px 28px;
+    overflow-y: auto;
+  }
+
+  .journal-input-area::-webkit-scrollbar { width: 4px; }
+  .journal-input-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+
+  .journal-textarea {
+    width: 100%;
+    height: 300px;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: rgba(255,255,255,0.85);
+    font-family: 'Inter', sans-serif;
+    font-size: 15px;
+    line-height: 1.8;
+    resize: none;
+    font-weight: 300;
+  }
+
+  .journal-textarea::placeholder {
+    color: rgba(255,255,255,0.2);
+  }
+
+  .journal-footer {
+    padding: 12px 28px 20px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .journal-btn {
+    padding: 10px 24px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .journal-btn.cancel {
+    background: transparent;
+    color: rgba(255,255,255,0.4);
+  }
+
+  .journal-btn.cancel:hover {
+    color: rgba(255,255,255,0.7);
+  }
+
+  .journal-btn.save {
+    background: linear-gradient(135deg, #4060d0, #6080f0);
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(60, 100, 220, 0.3);
+  }
+
+  .journal-btn.save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 24px rgba(60, 100, 220, 0.4);
+  }
+
+  .journal-entries {
+    margin-top: 12px;
+  }
+
+  .journal-entry {
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+    color: rgba(255,255,255,0.6);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .journal-entry .entry-date {
+    color: rgba(255,255,255,0.35);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  /* Earth hover tooltip */
+  .earth-tooltip {
+    position: fixed;
+    z-index: 90;
+    pointer-events: none;
+    background: rgba(10, 10, 20, 0.85);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    opacity: 0;
+    transition: opacity 0.2s;
+    white-space: nowrap;
+  }
+
+  .earth-tooltip.visible {
+    opacity: 1;
+  }
+
+  /* Scrollbar for settings */
+  .settings-panel::-webkit-scrollbar { width: 4px; }
+  .settings-panel::-webkit-scrollbar-track { background: transparent; }
+  .settings-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+
+  /* Loading */
+  .loading-screen {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: #000;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.8s ease;
+  }
+
+  .loading-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .loading-ring {
+    width: 60px;
+    height: 60px;
+    border: 2px solid rgba(255,255,255,0.1);
+    border-top-color: rgba(255,255,255,0.6);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .loading-text {
+    margin-top: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 3px;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Info badge */
+  .info-badge {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    font-size: 11px;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 1px;
+    font-family: 'Space Mono', monospace;
+  }
+</style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="loading-ring"></div>
+  <div class="loading-text">INITIALIZING COSMOS</div>
+</div>
+
+<!-- 3D Canvas -->
+<canvas id="canvas3d"></canvas>
+
+<!-- Top Bar -->
+<div class="top-bar">
+  <button class="settings-btn" id="settingsBtn" title="Settings">
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+  </button>
+</div>
+
+<!-- Date Display -->
+<div class="date-display">
+  <span id="currentDate">Today</span>
+  <span class="year" id="currentYear">2025</span>
+</div>
+
+<!-- Settings Overlay -->
+<div class="settings-overlay" id="settingsOverlay"></div>
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-title">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4"/></svg>
+    Settings
+  </div>
+
+  <div class="setting-group">
+    <label>Date of Birth</label>
+    <input type="date" class="dob-input" id="dobInput">
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="setting-group">
+    <label>Bodies Size</label>
+    <div class="size-control" style="margin-bottom:10px;">
+      <span style="font-size:12px;color:rgba(255,255,255,0.4);min-width:50px;">☉ Sun</span>
+      <input type="range" id="sunSize" min="0.5" max="5" step="0.1" value="2.5">
+      <span class="size-value" id="sunSizeVal">2.5</span>
+    </div>
+    <div class="size-control" style="margin-bottom:10px;">
+      <span style="font-size:12px;color:rgba(255,255,255,0.4);min-width:50px;">⊕ Earth</span>
+      <input type="range" id="earthSize" min="0.3" max="3" step="0.1" value="1">
+      <span class="size-value" id="earthSizeVal">1.0</span>
+    </div>
+    <div class="size-control">
+      <span style="font-size:12px;color:rgba(255,255,255,0.4);min-width:50px;">☽ Moon</span>
+      <input type="range" id="moonSize" min="0.1" max="1.5" step="0.1" value="0.35">
+      <span class="size-value" id="moonSizeVal">0.35</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="toggle-row">
+    <span class="toggle-label">Star Field</span>
+    <button class="toggle-switch active" id="toggleStars"></button>
+  </div>
+  <div class="toggle-row">
+    <span class="toggle-label">Orbit Trail</span>
+    <button class="toggle-switch active" id="toggleOrbit"></button>
+  </div>
+  <div class="toggle-row">
+    <span class="toggle-label">Sun Glow</span>
+    <button class="toggle-switch active" id="toggleGlow"></button>
+  </div>
+  <div class="toggle-row">
+    <span class="toggle-label">Auto Rotate</span>
+    <button class="toggle-switch active" id="toggleAutoRotate"></button>
+  </div>
+</div>
+
+<!-- Earth Tooltip -->
+<div class="earth-tooltip" id="earthTooltip">Click Earth to journal</div>
+
+<!-- Journal Panel -->
+<div class="journal-overlay" id="journalOverlay">
+  <div class="journal-panel" id="journalPanel">
+    <div class="journal-header">
+      <span class="journal-date" id="journalDate">January 1, 2025</span>
+      <span class="journal-year-badge" id="journalYearBadge">Year 0</span>
+    </div>
+    <div class="journal-input-area">
+      <textarea class="journal-textarea" id="journalTextarea" placeholder="What happened on this day in your cosmic journey?"></textarea>
+      <div class="journal-entries" id="journalEntries"></div>
+    </div>
+    <div class="journal-footer">
+      <button class="journal-btn cancel" id="journalCancel">Close</button>
+      <button class="journal-btn save" id="journalSave">Save Entry</button>
+    </div>
+  </div>
+</div>
+
+<!-- Info -->
+<div class="info-badge">✦ Move mouse to rotate · Scroll to zoom · Click Earth to journal</div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function() {
+  // ===== STATE =====
+  let dateOfBirth = new Date('1990-06-15');
+  const AGE_LIMIT = 100;
+  let showStars = true;
+  let showOrbit = true;
+  let showGlow = true;
+  let autoRotate = true;
+  let sunScale = 2.5;
+  let earthScale = 1.0;
+  let moonScale = 0.35;
+  let journalEntries = {};
+
+  // ===== THREE.JS SETUP =====
+  const canvas = document.getElementById('canvas3d');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x000005);
+  scene.fog = new THREE.FogExp2(0x000005, 0.015);
+
+  const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 30, 60);
+  camera.lookAt(0, 0, 0);
+
+  // ===== LIGHTING =====
+  const ambientLight = new THREE.AmbientLight(0x222233, 0.3);
+  scene.add(ambientLight);
+
+  const sunLight = new THREE.PointLight(0xffeedd, 2.5, 200);
+  sunLight.position.set(0, 0, 0);
+  scene.add(sunLight);
+
+  const sunLight2 = new THREE.PointLight(0xffaa44, 1.5, 100);
+  sunLight2.position.set(0, 5, 0);
+  scene.add(sunLight2);
+
+  // ===== SUN =====
+  const sunGeo = new THREE.SphereGeometry(1, 64, 64);
+  const sunMat = new THREE.MeshBasicMaterial({ color: 0xffcc44 });
+  const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+  sunMesh.scale.setScalar(sunScale);
+  sunMesh.name = 'sun';
+  scene.add(sunMesh);
+
+  // Sun glow
+  const glowGeo = new THREE.SphereGeometry(1.8, 32, 32);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xff8800,
+    transparent: true,
+    opacity: 0.15,
+    side: THREE.BackSide
+  });
+  const glowMesh = new THREE.Mesh(glowGeo, glowMat);
+  glowMesh.scale.setScalar(sunScale);
+  scene.add(glowMesh);
+
+  const glow2Geo = new THREE.SphereGeometry(3, 32, 32);
+  const glow2Mat = new THREE.MeshBasicMaterial({
+    color: 0xff6600,
+    transparent: true,
+    opacity: 0.05,
+    side: THREE.BackSide
+  });
+  const glow2Mesh = new THREE.Mesh(glow2Geo, glow2Mat);
+  glow2Mesh.scale.setScalar(sunScale);
+  scene.add(glow2Mesh);
+
+  // ===== EARTH =====
+  const earthGroup = new THREE.Group();
+  earthGroup.name = 'earthGroup';
+
+  const earthGeo = new THREE.SphereGeometry(0.5, 48, 48);
+  const earthMat = new THREE.MeshPhongMaterial({
+    color: 0x2255aa,
+    emissive: 0x112244,
+    emissiveIntensity: 0.15,
+    shininess: 30,
+    specular: 0x334455
+  });
+  const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+  earthMesh.scale.setScalar(earthScale);
+  earthMesh.name = 'earth';
+  earthGroup.add(earthMesh);
+
+  // Earth atmosphere
+  const atmosGeo = new THREE.SphereGeometry(0.58, 32, 32);
+  const atmosMat = new THREE.MeshBasicMaterial({
+    color: 0x4488ff,
+    transparent: true,
+    opacity: 0.1,
+    side: THREE.BackSide
+  });
+  const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat);
+  atmosMesh.scale.setScalar(earthScale);
+  earthGroup.add(atmosMesh);
+
+  // Continents (simple texture via procedural)
+  const canvas2d = document.createElement('canvas');
+  canvas2d.width = 256;
+  canvas2d.height = 128;
+  const ctx2d = canvas2d.getContext('2d');
+  // Simple continent shapes
+  ctx2d.fillStyle = '#1a6633';
+  const continents = [
+    [60,30,40,25],[100,35,30,20],[140,40,25,30],[180,50,35,20],[220,35,20,25],
+    [80,65,20,15],[150,70,30,15],[190,75,25,12]
+  ];
+  continents.forEach(c => {
+    ctx2d.beginPath();
+    ctx2d.ellipse(c[0], c[1], c[2]/2, c[3]/2, Math.random()*0.5, 0, Math.PI*2);
+    ctx2d.fill();
+  });
+  ctx2d.fillStyle = '#1a4466';
+  ctx2d.fillRect(0,0,256,128);
+  continents.forEach(c => {
+    ctx2d.beginPath();
+    ctx2d.ellipse(c[0], c[1], c[2]/2, c[3]/2, Math.random()*0.5, 0, Math.PI*2);
+    ctx2d.fillStyle = '#227744';
+    ctx2d.fill();
+  });
+
+  const earthTexture = new THREE.CanvasTexture(canvas2d);
+  const earthTexturedGeo = new THREE.SphereGeometry(0.505, 48, 48);
+  const earthTexturedMat = new THREE.MeshPhongMaterial({
+    map: earthTexture,
+    shininess: 20
+  });
+  const earthTexturedMesh = new THREE.Mesh(earthTexturedGeo, earthTexturedMat);
+  earthTexturedMesh.scale.setScalar(earthScale);
+  earthGroup.add(earthTexturedMesh);
+
+  scene.add(earthGroup);
+
+  // ===== MOON =====
+  const moonGeo = new THREE.SphereGeometry(0.15, 24, 24);
+  const moonMat = new THREE.MeshPhongMaterial({ color: 0xbbbbbb, shininess: 5 });
+  const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+  moonMesh.scale.setScalar(moonScale);
+  moonMesh.name = 'moon';
+  earthGroup.add(moonMesh);
+
+  // Moon orbit ring
+  const moonOrbitGeo = new THREE.RingGeometry(0.8 * earthScale, 0.82 * earthScale, 48);
+  const moonOrbitMat = new THREE.MeshBasicMaterial({
+    color: 0x666688,
+    transparent: true,
+    opacity: 0.2,
+    side: THREE.DoubleSide
+  });
+  const moonOrbitMesh = new THREE.Mesh(moonOrbitGeo, moonOrbitMat);
+  moonOrbitMesh.rotation.x = Math.PI / 2;
+  earthGroup.add(moonOrbitMesh);
+
+  // ===== ORBIT TRAIL =====
+  const spiralPoints = [];
+  const totalYears = AGE_LIMIT;
+  const coils = totalYears;
+  const pointsPerCoil = 120;
+  const totalPoints = coils * pointsPerCoil;
+
+  function generateSpiral() {
+    spiralPoints.length = 0;
+    for (let i = 0; i <= totalPoints; i++) {
+      const t = i / totalPoints;
+      const yearProgress = t * totalYears;
+
+      // Spiral converges toward the sun (right side)
+      const angle = t * coils * Math.PI * 2;
+      const radiusX = 35 * (1 - t * 0.85) + 2;
+      const radiusZ = 12 * (1 - t * 0.7);
+      const yOffset = Math.sin(t * Math.PI * 4) * 3 * (1 - t * 0.5);
+
+      const x = -40 + t * 50;
+      const y = Math.sin(angle) * radiusX * 0.4;
+      const z = Math.cos(angle) * radiusZ;
+
+      spiralPoints.push(new THREE.Vector3(x, y, z));
+    }
+  }
+  generateSpiral();
+
+  const orbitLineGeo = new THREE.BufferGeometry().setFromPoints(spiralPoints);
+  const orbitLineMat = new THREE.LineBasicMaterial({
+    color: 0x4466aa,
+    transparent: true,
+    opacity: 0.25
+  });
+  const orbitLine = new THREE.Line(orbitLineGeo, orbitLineMat);
+  scene.add(orbitLine);
+
+  // ===== STARS =====
+  let starField;
+  function createStars() {
+    if (starField) scene.remove(starField);
+
+    const count = 8000;
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const r = 100 + Math.random() * 400;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+
+      positions[i*3] = r * Math.sin(phi) * Math.cos(theta);
+      positions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
+      positions[i*3+2] = r * Math.cos(phi);
+
+      // Milky way concentration along a plane
+      const milkyWayFactor = Math.exp(-Math.abs(positions[i*3+1]) / 40) * 0.7 + 0.3;
+      const temp = Math.random();
+      if (temp < 0.3) {
+        colors[i*3] = 0.7 + Math.random()*0.3;
+        colors[i*3+1] = 0.7 + Math.random()*0.3;
+        colors[i*3+2] = 0.9 + Math.random()*0.1;
+      } else if (temp < 0.6) {
+        colors[i*3] = 1;
+        colors[i*3+1] = 0.9 + Math.random()*0.1;
+        colors[i*3+2] = 0.7 + Math.random()*0.3;
+      } else {
+        colors[i*3] = 0.8 + Math.random()*0.2;
+        colors[i*3+1] = 0.8 + Math.random()*0.2;
+        colors[i*3+2] = 0.8 + Math.random()*0.2;
+      }
+
+      colors[i*3] *= milkyWayFactor;
+      colors[i*3+1] *= milkyWayFactor;
+      colors[i*3+2] *= milkyWayFactor;
+
+      sizes[i] = 0.3 + Math.random() * 1.5;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+    const mat = new THREE.PointsMaterial({
+      size: 0.6,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.85,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    starField = new THREE.Points(geo, mat);
+    scene.add(starField);
+  }
+  createStars();
+
+  // ===== MILKY WAY BAND =====
+  function createMilkyWay() {
+    const count = 3000;
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+
+    for (let i = 0; i < count; i++) {
+      const x = (Math.random() - 0.5) * 500;
+      const y = (Math.random() - 0.5) * 30;
+      const z = (Math.random() - 0.5) * 500;
+      positions[i*3] = x;
+      positions[i*3+1] = y;
+      positions[i*3+2] = z;
+
+      const brightness = 0.3 + Math.random() * 0.4;
+      colors[i*3] = brightness * 0.8;
+      colors[i*3+1] = brightness * 0.7;
+      colors[i*3+2] = brightness * 1.0;
+    }
+
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+    const mat = new THREE.PointsMaterial({
+      size: 0.4,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.4,
+      sizeAttenuation: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const milkyWay = new THREE.Points(geo, mat);
+    milkyWay.name = 'milkyway';
+    scene.add(milkyWay);
+  }
+  createMilkyWay();
+
+  // ===== EARTH POSITION CALCULATION =====
+  function getEarthPosition(date) {
+    const dob = new Date(dateOfBirth);
+    const diffMs = date.getTime() - dob.getTime();
+    const diffYears = diffMs / (1000 * 60 * 60 * 24 * 365.25);
+    const t = Math.min(Math.max(diffYears / totalYears, 0), 1);
+
+    const angle = t * coils * Math.PI * 2;
+    const pointsPerCoilLocal = 120;
+    const pointIndex = Math.floor(t * totalPoints);
+    const nextIndex = Math.min(pointIndex + 1, spiralPoints.length - 1);
+
+    const currentPt = spiralPoints[pointIndex];
+    const nextPt = spiralPoints[nextIndex];
+    const localT = (t * totalPoints) - pointIndex;
+
+    const pos = new THREE.Vector3().lerpVectors(currentPt, nextPt, localT);
+    return { pos, t, yearProgress: diffYears };
+  }
+
+  function updateEarthPosition(date) {
+    const { pos } = getEarthPosition(date);
+    earthGroup.position.copy(pos);
+  }
+
+  // Initial position
+  const now = new Date();
+  updateEarthPosition(now);
+
+  // ===== MOUSE / CAMERA CONTROL =====
+  let mouseX = 0, mouseY = 0;
+  let targetRotX = 0, targetRotY = 0;
+  let currentRotX = 0, currentRotY = 0;
+  let cameraDistance = 60;
+  let targetDistance = 60;
+  let isDragging = false;
+  let prevMouseX = 0, prevMouseY = 0;
+
+  document.addEventListener('mousemove', (e) => {
+    mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    if (isDragging) {
+      const dx = e.clientX - prevMouseX;
+      const dy = e.clientY - prevMouseY;
+      targetRotY += dx * 0.005;
+      targetRotX += dy * 0.005;
+      targetRotX = Math.max(-1.2, Math.min(1.2, targetRotX));
+      prevMouseX = e.clientX;
+      prevMouseY = e.clientY;
+    }
+  });
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    prevMouseX = e.clientX;
+    prevMouseY = e.clientY;
+  });
+
+  document.addEventListener('mouseup', () => { isDragging = false; });
+
+  canvas.addEventListener('wheel', (e) => {
+    targetDistance += e.deltaY * 0.03;
+    targetDistance = Math.max(20, Math.min(150, targetDistance));
+  });
+
+  // Touch support
+  canvas.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      isDragging = true;
+      prevMouseX = e.touches[0].clientX;
+      prevMouseY = e.touches[0].clientY;
+    }
+  });
+
+  canvas.addEventListener('touchmove', (e) => {
+    if (isDragging && e.touches.length === 1) {
+      const dx = e.touches[0].clientX - prevMouseX;
+      const dy = e.touches[0].clientY - prevMouseY;
+      targetRotY += dx * 0.005;
+      targetRotX += dy * 0.005;
+      targetRotX = Math.max(-1.2, Math.min(1.2, targetRotX));
+      prevMouseX = e.touches[0].clientX;
+      prevMouseY = e.touches[0].clientY;
+    }
+  });
+
+  canvas.addEventListener('touchend', () => { isDragging = false; });
+
+  // ===== RAYCASTING FOR EARTH CLICK =====
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let isJournalOpen = false;
+
+  canvas.addEventListener('click', (e) => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects([earthMesh, earthTexturedMesh], true);
+
+    if (intersects.length > 0) {
+      openJournal();
+    }
+  });
+
+  // Hover tooltip
+  const tooltip = document.getElementById('earthTooltip');
+  canvas.addEventListener('mousemove', (e) => {
+    if (isDragging) return;
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects([earthMesh, earthTexturedMesh], true);
+
+    if (intersects.length > 0) {
+      canvas.style.cursor = 'pointer';
+      tooltip.classList.add('visible');
+      tooltip.style.left = (e.clientX + 15) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+    } else {
+      canvas.style.cursor = 'grab';
+      tooltip.classList.remove('visible');
+    }
+  });
+
+  // ===== JOURNAL =====
+  const journalPanel = document.getElementById('journalPanel');
+  const journalOverlay = document.getElementById('journalOverlay');
+  const journalTextarea = document.getElementById('journalTextarea');
+  const journalDate = document.getElementById('journalDate');
+  const journalYearBadge = document.getElementById('journalYearBadge');
+  const journalEntries = document.getElementById('journalEntries');
+  const journalCancel = document.getElementById('journalCancel');
+
+  function openJournal() {
+    isJournalOpen = true;
+    journalPanel.classList.add('active');
+
+    const currentPos = getEarthPosition(now);
+    const yearsSinceDOB = Math.floor(currentPos.yearProgress);
+    const dayOfYear = Math.floor((currentPos.yearProgress - yearsSinceDOB) * 365.25);
+
+    const targetDate = new Date(dateOfBirth);
+    targetDate.setDate(targetDate.getDate() + Math.floor(currentPos.yearProgress * 365.25));
+
+    journalDate.textContent = targetDate.toLocaleDateString('en-US', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    });
+    journalYearBadge.textContent = `Year ${yearsSinceDOB} of ${AGE_LIMIT}`;
+
+    // Load saved entry
+    const key = targetDate.toISOString().split('T')[0];
+    journalTextarea.value = journalEntries[key] || '';
+  }
+
+  function closeJournal() {
+    isJournalOpen = false;
+    journalPanel.classList.remove('active');
+  }
+
+  journalCancel.addEventListener('click', closeJournal);
+
+  journalOverlay.addEventListener('click', (e) => {
+    if (e.target === journalOverlay) closeJournal();
+  });
+
+  document.getElementById('journalSave').addEventListener('click', () => {
+    const currentPos = getEarthPosition(now);
+    const targetDate = new Date(dateOfBirth);
+    targetDate.setDate(targetDate.getDate() + Math.floor(currentPos.yearProgress * 365.25));
+    const key = targetDate.toISOString().split('T')[0];
+
+    journalEntries[key] = journalTextarea.value;
+    saveEntries();
+    closeJournal();
+  });
+
+  function saveEntries() {
+    try { localStorage.setItem('cosmicJournal', JSON.stringify(journalEntries)); } catch(e) {}
+  }
+
+  function loadEntries() {
+    try {
+      const saved = localStorage.getItem('cosmicJournal');
+      if (saved) journalEntries = JSON.parse(saved);
+    } catch(e) {}
+  }
+  loadEntries();
+
+  // ===== SETTINGS =====
+  const settingsBtn = document.getElementById('settingsBtn');
+  const settingsPanel = document.getElementById('settingsPanel');
+  const settingsOverlay = document.getElementById('settingsOverlay');
+
+  settingsBtn.addEventListener('click', () => {
+    settingsPanel.classList.toggle('active');
+    settingsOverlay.classList.toggle('active');
+  });
+
+  settingsOverlay.addEventListener('click', () => {
+    settingsPanel.classList.remove('active');
+    settingsOverlay.classList.remove('active');
+  });
+
+  // DOB
+  const dobInput = document.getElementById('dobInput');
+  const defaultDOB = new Date(1990, 5, 15);
+  dobInput.value = defaultDOB.toISOString().split('T')[0];
+  dateOfBirth = new Date(defaultDOB);
+
+  dobInput.addEventListener('change', (e) => {
+    dateOfBirth = new Date(e.target.value);
+    updateEarthPosition(now);
+  });
+
+  // Size controls
+  document.getElementById('sunSize').addEventListener('input', (e) => {
+    sunScale = parseFloat(e.target.value);
+    document.getElementById('sunSizeVal').textContent = sunScale.toFixed(1);
+    sunMesh.scale.setScalar(sunScale);
+    glowMesh.scale.setScalar(sunScale * 1.8 / 2.5);
+    glow2Mesh.scale.setScalar(sunScale * 3 / 2.5);
+    sunLight.intensity = 1.5 + sunScale * 0.5;
+  });
+
+  document.getElementById('earthSize').addEventListener('input', (e) => {
+    earthScale = parseFloat(e.target.value);
+    document.getElementById('earthSizeVal').textContent = earthScale.toFixed(1);
+    earthMesh.scale.setScalar(earthScale);
+    atmosMesh.scale.setScalar(earthScale);
+    earthTexturedMesh.scale.setScalar(earthScale);
+    moonOrbitMesh.scale.setScalar(earthScale);
+  });
+
+  document.getElementById('moonSize').addEventListener('input', (e) => {
+    moonScale = parseFloat(e.target.value);
+    document.getElementById('moonSizeVal').textContent = moonScale.toFixed(1);
+    moonMesh.scale.setScalar(moonScale);
+  });
+
+  // Toggles
+  function setupToggle(id, stateVar, callback) {
+    const btn = document.getElementById(id);
+    btn.addEventListener('click', () => {
+      stateVar.value = !stateVar.value;
+      btn.classList.toggle('active', stateVar.value);
+      callback(stateVar.value);
+    });
+  }
+
+  setupToggle('toggleStars', { value: true }, (v) => {
+    showStars = v;
+    if (starField) starField.visible = v;
+    const mw = scene.getObjectByName('milkyway');
+    if (mw) mw.visible = v;
+  });
+
+  setupToggle('toggleOrbit', { value: true }, (v) => {
+    showOrbit = v;
+    orbitLine.visible = v;
+  });
+
+  setupToggle('toggleGlow', { value: true }, (v) => {
+    showGlow = v;
+    glowMesh.visible = v;
+    glow2Mesh.visible = v;
+  });
+
+  // ===== ANIMATION =====
+  let time = 0;
+  const clock = new THREE.Clock();
+
+  function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    time += delta;
+
+    // Camera
+    if (autoRotate) targetRotY += delta * 0.03;
+    currentRotX += (targetRotX - currentRotX) * 0.05;
+    currentRotY += (targetRotY - currentRotY) * 0.05;
+    cameraDistance += (targetDistance - cameraDistance) * 0.05;
+
+    camera.position.x = Math.sin(currentRotY) * Math.cos(currentRotX) * cameraDistance;
+    camera.position.y = Math.sin(currentRotX) * cameraDistance * 0.5 + 10;
+    camera.position.z = Math.cos(currentRotY) * Math.cos(currentRotX) * cameraDistance;
+    camera.lookAt(0, 0, 0);
+
+    // Earth rotation
+    earthMesh.rotation.y += delta * 0.3;
+    earthTexturedMesh.rotation.y += delta * 0.3;
+    atmosMesh.rotation.y += delta * 0.1;
+
+    // Moon orbit
+    const moonAngle = time * 0.8;
+    const moonOrbitRadius = 1.2 * earthScale;
+    moonMesh.position.x = Math.cos(moonAngle) * moonOrbitRadius;
+    moonMesh.position.z = Math.sin(moonAngle) * moonOrbitRadius;
+    moonMesh.position.y = Math.sin(moonAngle * 0.5) * 0.3 * earthScale;
+    moonOrbitMesh.rotation.x = Math.PI / 2 + Math.sin(time * 0.3) * 0.1;
+
+    // Sun pulse
+    const pulse = 1 + Math.sin(time * 2) * 0.02;
+    sunMesh.scale.setScalar(sunScale * pulse);
+
+    // Stars subtle rotation
+    if (starField) {
+      starField.rotation.y += delta * 0.001;
+    }
+
+    // Update date display
+    const dateDisplay = document.getElementById('currentDate');
+    const yearDisplay = document.getElementById('currentYear');
+    dateDisplay.textContent = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    yearDisplay.textContent = now.getFullYear();
+
+    renderer.render(scene, camera);
+  }
+
+  // ===== RESIZE =====
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  // ===== INIT =====
+  setTimeout(() => {
+    document.getElementById('loadingScreen').classList.add('hidden');
+  }, 1500);
+
+  animate();
+
+})();
+</script>
+</body>
+</html>

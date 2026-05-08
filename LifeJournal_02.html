@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cosmic Earth Journal</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    canvas:active {
+      cursor: grabbing;
+    }
+
+    /* ===== LOADING SCREEN ===== */
+    .loading-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(ellipse at center, #0a0e27 0%, #000000 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s ease;
+    }
+
+    .loading-screen.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-ring {
+      width: 80px;
+      height: 80px;
+      border: 3px solid transparent;
+      border-top: 3px solid #4a90e2;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+
+    .loading-text {
+      font-size: 14px;
+      letter-spacing: 2px;
+      opacity: 0.7;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ===== HEADER UI ===== */
+    .header {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      pointer-events: none;
+    }
+
+    .header h1 {
+      font-size: 24px;
+      font-weight: 300;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    .header p {
+      font-size: 13px;
+      opacity: 0.6;
+    }
+
+    .date-display {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      text-align: right;
+      z-index: 100;
+    }
+
+    .date-display .date {
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+
+    .date-display .year {
+      font-size: 14px;
+      opacity: 0.6;
+    }
+
+    /* ===== TOOLTIP ===== */
+    #earthTooltip {
+      position: absolute;
+      padding: 8px 12px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      font-size: 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+
+    #earthTooltip.visible {
+      opacity: 1;
+    }
+
+    /* ===== JOURNAL PANEL ===== */
+    .journal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .journal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .journal-panel {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      width: min(90vw, 800px);
+      height: min(80vh, 600px);
+      background: linear-gradient(135deg, #0a0e27 0%, #050510 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      z-index: 101;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      overflow: hidden;
+    }
+
+    .journal-panel.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .journal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .journal-header h2 {
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 1px;
+    }
+
+    .journal-date {
+      font-size: 13px;
+      opacity: 0.6;
+      margin-top: 4px;
+    }
+
+    .journal-year-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: rgba(74, 144, 226, 0.2);
+      border: 1px solid rgba(74, 144, 226, 0.3);
+      border-radius: 20px;
+      font-size: 12px;
+      color: #4a90e2;
+    }
+
+    .journal-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 24px;
+      overflow: hidden;
+    }
+
+    .journal-textarea {
+      flex: 1;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 16px;
+      color: #fff;
+      font-size: 15px;
+      line-height: 1.6;
+      resize: none;
+      font-family: 'Georgia', serif;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .journal-textarea:focus {
+      border-color: rgba(74, 144, 226, 0.5);
+    }
+
+    .journal-textarea::placeholder {
+      color: rgba(255, 255, 255, 0.3);
+    }
+
+    .journal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .journal-char-count {
+      font-size: 12px;
+      opacity: 0.5;
+    }
+
+    .journal-actions {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4a90e2, #357abd);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(74, 144, 226, 0.3);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    /* ===== SETTINGS PANEL ===== */
+    .settings-toggle {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 100;
+    }
+
+    .settings-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .settings-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .settings-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 199;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+    }
+
+    .settings-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .settings-panel {
+      position: fixed;
+      bottom: 80px;
+      left: 20px;
+      width: min(90vw, 360px);
+      background: linear-gradient(135deg, #0a0e27 0%, #050510 100%);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+      z-index: 200;
+      padding: 24px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(20px);
+      transition: all 0.3s ease;
+    }
+
+    .settings-panel.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateY(0);
+    }
+
+    .settings-panel h3 {
+      font-size: 16px;
+      font-weight: 400;
+      margin-bottom: 20px;
+      letter-spacing: 1px;
+    }
+
+    .setting-group {
+      margin-bottom: 18px;
+    }
+
+    .setting-group label {
+      display: block;
+      font-size: 12px;
+      opacity: 0.6;
+      margin-bottom: 6px;
+    }
+
+    .setting-group .value {
+      display: inline-block;
+      float: right;
+      font-size: 12px;
+      opacity: 0.8;
+      color: #4a90e2;
+    }
+
+    .setting-group input[type="range"] {
+      width: 100%;
+      accent-color: #4a90e2;
+    }
+
+    .setting-group input[type="date"] {
+      width: 100%;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .toggle-group label {
+      font-size: 13px;
+      opacity: 0.8;
+    }
+
+    .toggle-btn {
+      width: 44px;
+      height: 24px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+    }
+
+    .toggle-btn.active {
+      background: #4a90e2;
+    }
+
+    .toggle-btn::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 0.2s;
+    }
+
+    .toggle-btn.active::after {
+      transform: translateX(20px);
+    }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      .header h1 { font-size: 18px; }
+      .date-display .date { font-size: 20px; }
+      .journal-panel { width: 95vw; height: 90vh; }
+      .settings-panel { width: 95vw; left: 2.5vw; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div class="loading-screen" id="loadingScreen">
+    <div class="loading-ring"></div>
+    <div class="loading-text">INITIALIZING COSMOS</div>
+  </div>
+
+  <!-- 3D Canvas -->
+  <canvas id="canvas3d"></canvas>
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Cosmic Journal</h1>
+    <p>Trace your orbit through the cosmos</p>
+  </div>
+
+  <!-- Date Display -->
+  <div class="date-display">
+    <div class="date" id="currentDate">Loading...</div>
+    <div class="year" id="currentYear"></div>
+  </div>
+
+  <!-- Earth Tooltip -->
+  <div id="earthTooltip">Click Earth to open journal</div>
+
+  <!-- Journal Overlay -->
+  <div class="journal-overlay" id="journalOverlay"></div>
+
+  <!-- Journal Panel -->
+  <div class="journal-panel" id="journalPanel">
+    <div class="journal-header">
+      <div>
+        <h2>Daily Entry</h2>
+        <div class="journal-date" id="journalDate"></div>
+      </div>
+      <div class="journal-year-badge" id="journalYearBadge">Year 0</div>
+    </div>
+    <div class="journal-content">
+      <textarea class="journal-textarea" id="journalTextarea" placeholder="Enter your thoughts for this day..."></textarea>
+    </div>
+    <div class="journal-footer">
+      <div class="journal-char-count" id="charCount">0 characters</div>
+      <div class="journal-actions">
+        <button class="btn btn-secondary" id="journalCancel">Cancel</button>
+        <button class="btn btn-primary" id="journalSave">Save Entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Toggle -->
+  <div class="settings-toggle">
+    <button class="settings-btn" id="settingsBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Settings Overlay -->
+  <div class="settings-overlay" id="settingsOverlay"></div>
+
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settingsPanel">
+    <h3>Settings</h3>
+    
+    <div class="setting-group">
+      <label>Date of Birth</label>
+      <input type="date" id="dobInput">
+    </div>
+
+    <div class="setting-group">
+      <label>Sun Size <span class="value" id="sunSizeVal">2.5</span></label>
+      <input type="range" id="sunSize" min="1" max="5" step="0.1" value="2.5">
+    </div>
+
+    <div class="setting-group">
+      <label>Earth Size <span class="value" id="earthSizeVal">1.0</span></label>
+      <input type="range" id="earthSize" min="0.5" max="3" step="0.1" value="1">
+    </div>
+
+    <div class="setting-group">
+      <label>Moon Size <span class="value" id="moonSizeVal">0.5</span></label>
+      <input type="range" id="moonSize" min="0.1" max="1" step="0.1" value="0.5">
+    </div>
+
+    <div class="toggle-group">
+      <label>Show Stars</label>
+      <div class="toggle-btn active" id="toggleStars"></div>
+    </div>
+
+    <div class="toggle-group">
+      <label>Show Orbit</label>
+      <div class="toggle-btn active" id="toggleOrbit"></div>
+    </div>
+
+    <div class="toggle-group">
+      <label>Sun Glow</label>
+      <div class="toggle-btn active" id="toggleGlow"></div>
+    </div>
+  </div>
+
+  <!-- Three.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  
+  <script>
+  (function() {
+    // ===== ROBUST LOADING SCREEN HANDLING =====
+    const loadingScreen = document.getElementById('loadingScreen');
+    
+    // Safety timeout: If the script fails or hangs, ensure the screen clears after 5 seconds
+    const safetyTimeout = setTimeout(() => {
+      if (loadingScreen) loadingScreen.classList.add('hidden');
+    }, 5000);
+
+    // Check if Three.js loaded successfully
+    if (typeof THREE === 'undefined') {
+      console.error('Three.js library failed to load. Loading screen will disappear.');
+      clearTimeout(safetyTimeout);
+      if (loadingScreen) loadingScreen.classList.add('hidden');
+      return; // Stop execution
+    }
+
+    // Clear safety timeout since we are good to go
+    clearTimeout(safetyTimeout);
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+
+    // ===== CONFIGURATION =====
+    const AGE_LIMIT = 80; // Total years for the spiral
+    
+    // Default scale values (must be defined before use)
+    let sunScale = 2.5;
+    let earthScale = 1.0;
+    let moonScale = 0.5;
+    
+    let dateOfBirth = new Date(1990, 5, 15); // Default: June 15, 1990
+    let totalYears = AGE_LIMIT;
+    
+    let showStars = true;
+    let showOrbit = true;
+    let showGlow = true;
+    let autoRotate = true;
+    let journalEntries = {};
+
+    // ===== SCENE SETUP =====
+    const canvas = document.getElementById('canvas3d');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x000000, 0.0008);
+
+    const camera = new THREE.PerspectiveCamera(
+      45, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+    camera.position.set(0, 10, 60);
+    camera.lookAt(0, 0, 0);
+
+    // ===== SUN =====
+    const sunGroup = new THREE.Group();
+    sunGroup.name = 'sunGroup';
+    scene.add(sunGroup);
+
+    const sunGeo = new THREE.SphereGeometry(1, 64, 64);
+    const sunMat = new THREE.MeshBasicMaterial({ color: 0xffcc00 });
+    const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+    sunMesh.scale.setScalar(sunScale);
+    sunGroup.add(sunMesh);
+
+    // Sun glow layers
+    const glowGeo1 = new THREE.SphereGeometry(1.5, 32, 32);
+    const glowMat1 = new THREE.MeshBasicMaterial({
+      color: 0xff8800,
+      transparent: true,
+      opacity: 0.15,
+      side: THREE.BackSide
+    });
+    const glowMesh = new THREE.Mesh(glowGeo1, glowMat1);
+    glowMesh.scale.setScalar(sunScale * 1.8 / 2.5);
+    glowMesh.name = 'glow1';
+    sunGroup.add(glowMesh);
+
+    const glowGeo2 = new THREE.SphereGeometry(2, 32, 32);
+    const glowMat2 = new THREE.MeshBasicMaterial({
+      color: 0xff4400,
+      transparent: true,
+      opacity: 0.05,
+      side: THREE.BackSide
+    });
+    const glowMesh2 = new THREE.Mesh(glowGeo2, glowMat2);
+    glowMesh2.scale.setScalar(sunScale * 3 / 2.5);
+    glowMesh2.name = 'glow2';
+    sunGroup.add(glowMesh2);
+
+    const sunLight = new THREE.PointLight(0xffeedd, 1.5, 200);
+    sunGroup.add(sunLight);
+
+    // ===== EARTH =====
+    const earthGroup = new THREE.Group();
+    earthGroup.name = 'earthGroup';
+
+    const earthGeo = new THREE.SphereGeometry(0.5, 48, 48);
+    const earthMat = new THREE.MeshPhongMaterial({
+      color: 0x2255aa,
+      emissive: 0x112244,
+      emissiveIntensity: 0.15,
+      shininess: 30,
+      specular: 0x334455
+    });
+    const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+    earthMesh.scale.setScalar(earthScale);
+    earthMesh.name = 'earth';
+    earthGroup.add(earthMesh);
+
+    // Earth atmosphere
+    const atmosGeo = new THREE.SphereGeometry(0.58, 32, 32);
+    const atmosMat = new THREE.MeshBasicMaterial({
+      color: 0x4488ff,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.BackSide
+    });
+    const atmosMesh = new THREE.Mesh(atmosGeo, atmosMat);
+    atmosMesh.scale.setScalar(earthScale);
+    earthGroup.add(atmosMesh);
+
+    // Continents (simple texture via procedural)
+    const canvas2d = document.createElement('canvas');
+    canvas2d.width = 256;
+    canvas2d.height = 128;
+    const ctx2d = canvas2d.getContext('2d');
+    // Simple continent shapes
+    ctx2d.fillStyle = '#1a6633';
+    const continents = [
+      [60,30,40,25],[100,35,30,20],[140,40,25,30],[180,50,35,20],[220,35,20,25],
+      [80,65,20,15],[150,70,30,15],[190,75,25,12]
+    ];
+    continents.forEach(c => {
+      ctx2d.beginPath();
+      ctx2d.ellipse(c[0], c[1], c[2]/2, c[3]/2, Math.random()*0.5, 0, Math.PI*2);
+      ctx2d.fill();
+    });
+    ctx2d.fillStyle = '#1a4466';
+    ctx2d.fillRect(0,0,256,128);
+    continents.forEach(c => {
+      ctx2d.beginPath();
+      ctx2d.ellipse(c[0], c[1], c[2]/2, c[3]/2, Math.random()*0.5, 0, Math.PI*2);
+      ctx2d.fillStyle = '#227744';
+      ctx2d.fill();
+    });
+
+    const earthTexture = new THREE.CanvasTexture(canvas2d);
+    const earthTexturedGeo = new THREE.SphereGeometry(0.505, 48, 48);
+    const earthTexturedMat = new THREE.MeshPhongMaterial({
+      map: earthTexture,
+      shininess: 20
+    });
+    const earthTexturedMesh = new THREE.Mesh(earthTexturedGeo, earthTexturedMat);
+    earthTexturedMesh.scale.setScalar(earthScale);
+    earthGroup.add(earthTexturedMesh);
+
+    scene.add(earthGroup);
+
+    // ===== MOON =====
+    const moonGeo = new THREE.SphereGeometry(0.15, 24, 24);
+    const moonMat = new THREE.MeshPhongMaterial({ color: 0xbbbbbb, shininess: 5 });
+    const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    moonMesh.scale.setScalar(moonScale);
+    moonMesh.name = 'moon';
+    earthGroup.add(moonMesh);
+
+    // Moon orbit ring
+    const moonOrbitGeo = new THREE.RingGeometry(0.8 * earthScale, 0.82 * earthScale, 48);
+    const moonOrbitMat = new THREE.MeshBasicMaterial({
+      color: 0x666688,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.DoubleSide
+    });
+    const moonOrbitMesh = new THREE.Mesh(moonOrbitGeo, moonOrbitMat);
+    moonOrbitMesh.rotation.x = Math.PI / 2;
+    earthGroup.add(moonOrbitMesh);
+
+    // ===== ORBIT TRAIL =====
+    const spiralPoints = [];
+    const coils = totalYears;
+    const pointsPerCoil = 120;
+    const totalPoints = coils * pointsPerCoil;
+
+    function generateSpiral() {
+      spiralPoints.length = 0;
+      for (let i = 0; i <= totalPoints; i++) {
+        const t = i / totalPoints;
+        const yearProgress = t * totalYears;
+
+        // Spiral converges toward the sun (right side)
+        const angle = t * coils * Math.PI * 2;
+        const radiusX = 35 * (1 - t * 0.85) + 2;
+        const radiusZ = 12 * (1 - t * 0.7);
+        const yOffset = Math.sin(t * Math.PI * 4) * 3 * (1 - t * 0.5);
+
+        const x = -40 + t * 50;
+        const y = Math.sin(angle) * radiusX * 0.4;
+        const z = Math.cos(angle) * radiusZ;
+
+        spiralPoints.push(new THREE.Vector3(x, y, z));
+      }
+    }
+
+    generateSpiral();
+
+    const spiralGeo = new THREE.BufferGeometry().setFromPoints(spiralPoints);
+    const spiralMat = new THREE.LineBasicMaterial({
+      color: 0x3366aa,
+      transparent: true,
+      opacity: 0.3,
+    });
+    const spiralLine = new THREE.Line(spiralGeo, spiralMat);
+    scene.add(spiralLine);
+
+    // Draw current position marker on spiral
+    let currentSpiralIndex = 0;
+    const currentSpiralMarkerGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const currentSpiralMarkerMat = new THREE.MeshBasicMaterial({ color: 0xff4444 });
+    const currentSpiralMarker = new THREE.Mesh(currentSpiralMarkerGeo, currentSpiralMarkerMat);
+    currentSpiralMarker.visible = false;
+    scene.add(currentSpiralMarker);
+
+    function updateSpiralPosition() {
+      const ageInYears = (Date.now() - dateOfBirth.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      const yearProgress = Math.min(ageInYears, totalYears);
+      const t = yearProgress / totalYears;
+
+      const index = Math.floor(t * (spiralPoints.length - 1));
+      if (index !== currentSpiralIndex) {
+        currentSpiralIndex = index;
+      }
+
+      const pos = spiralPoints[Math.min(index, spiralPoints.length - 1)];
+      currentSpiralMarker.position.copy(pos);
+      currentSpiralMarker.visible = true;
+    }
+
+    // ===== STARS =====
+    const starCount = 5000;
+    const starGeo = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+    const starSizes = new Float32Array(starCount);
+
+    for (let i = 0; i < starCount; i++) {
+      const i3 = i * 3;
+      const radius = 200 + Math.random() * 400;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+
+      starPositions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+      starPositions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      starPositions[i3 + 2] = radius * Math.cos(phi);
+
+      const colorTemp = Math.random();
+      if (colorTemp < 0.3) { // Blue stars
+        starColors[i3] = 0.6 + Math.random() * 0.4;
+        starColors[i3 + 1] = 0.7 + Math.random() * 0.3;
+        starColors[i3 + 2] = 1.0;
+      } else if (colorTemp < 0.6) { // Yellow stars
+        starColors[i3] = 1.0;
+        starColors[i3 + 1] = 0.9 + Math.random() * 0.1;
+        starColors[i3 + 2] = 0.5 + Math.random() * 0.3;
+      } else { // White stars
+        const v = 0.8 + Math.random() * 0.2;
+        starColors[i3] = v;
+        starColors[i3 + 1] = v;
+        starColors[i3 + 2] = v;
+      }
+
+      starSizes[i] = 0.5 + Math.random() * 1.5;
+    }
+
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+    starGeo.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+
+    const starMat = new THREE.PointsMaterial({
+      size: 0.8,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      sizeAttenuation: true
+    });
+
+    const starField = new THREE.Points(starGeo, starMat);
+    starField.name = 'starField';
+    scene.add(starField);
+
+    // ===== MOUSE INTERACTION =====
+    let isDragging = false;
+    let previousMouse = { x: 0, y: 0 };
+    let cameraAngle = { theta: 0, phi: Math.PI / 6 };
+    let cameraRadius = 60;
+    let targetAngle = { theta: 0, phi: Math.PI / 6 };
+
+    canvas.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      previousMouse.x = e.clientX;
+      previousMouse.y = e.clientY;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+      // Check hover
+      checkHover(e.clientX, e.clientY);
+
+      if (!isDragging) return;
+
+      const dx = e.clientX - previousMouse.x;
+      const dy = e.clientY - previousMouse.y;
+
+      targetAngle.theta -= dx * 0.005;
+      targetAngle.phi = Math.max(0.1, Math.min(Math.PI - 0.1, targetAngle.phi + dy * 0.005));
+
+      previousMouse.x = e.clientX;
+      previousMouse.y = e.clientY;
+    });
+
+    canvas.addEventListener('mouseup', () => isDragging = false);
+    canvas.addEventListener('mouseleave', () => isDragging = false);
+
+    // Scroll to zoom
+    canvas.addEventListener('wheel', (e) => {
+      cameraRadius = Math.max(20, Math.min(120, cameraRadius + e.deltaY * 0.05));
+    });
+
+    // Touch support
+    let touchStart = null;
+    let touchRadius = 0;
+
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        isDragging = true;
+        previousMouse.x = e.touches[0].clientX;
+        previousMouse.y = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        touchRadius = Math.sqrt(dx*dx + dy*dy);
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && isDragging) {
+        const dx = e.touches[0].clientX - previousMouse.x;
+        const dy = e.touches[0].clientY - previousMouse.y;
+        targetAngle.theta -= dx * 0.005;
+        targetAngle.phi = Math.max(0.1, Math.min(Math.PI - 0.1, targetAngle.phi + dy * 0.005));
+        previousMouse.x = e.touches[0].clientX;
+        previousMouse.y = e.touches[0].clientY;
+      } else if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const newRadius = Math.sqrt(dx*dx + dy*dy);
+        const delta = touchRadius - newRadius;
+        cameraRadius = Math.max(20, Math.min(120, cameraRadius + delta * 0.1));
+        touchRadius = newRadius;
+      }
+    }, { passive: true });
+
+    canvas.addEventListener('touchend', () => { isDragging = false; });
+
+    // ===== RAYCASTER (Hover/Click) =====
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const tooltip = document.getElementById('earthTooltip');
+
+    function checkHover(clientX, clientY) {
+      mouse.x = (clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects([earthMesh]);
+
+      if (intersects.length > 0) {
+        canvas.style.cursor = 'pointer';
+        tooltip.classList.add('visible');
+        tooltip.style.left = (clientX + 15) + 'px';
+        tooltip.style.top = (clientY - 10) + 'px';
+        window._hoveredEarth = true;
+      } else {
+        canvas.style.cursor = 'grab';
+        tooltip.classList.remove('visible');
+        window._hoveredEarth = false;
+      }
+    }
+
+    canvas.addEventListener('click', (e) => {
+      if (window._hoveredEarth) {
+        openJournal();
+      }
+    });
+
+    // ===== UI ELEMENTS =====
+    const currentDateEl = document.getElementById('currentDate');
+    const currentYearEl = document.getElementById('currentYear');
+    const journalPanel = document.getElementById('journalPanel');
+    const journalOverlay = document.getElementById('journalOverlay');
+    const journalDateEl = document.getElementById('journalDate');
+    const journalYearBadgeEl = document.getElementById('journalYearBadge');
+    const journalTextarea = document.getElementById('journalTextarea');
+    const charCountEl = document.getElementById('charCount');
+    const settingsPanel = document.getElementById('settingsPanel');
+    const settingsOverlay = document.getElementById('settingsOverlay');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const dobInput = document.getElementById('dobInput');
+
+    // Set default DOB
+    const defaultDOB = new Date(1990, 5, 15);
+    const yyyy = defaultDOB.getFullYear();
+    const mm = String(defaultDOB.getMonth() + 1).padStart(2, '0');
+    const dd = String(defaultDOB.getDate()).padStart(2, '0');
+    dobInput.value = `${yyyy}-${mm}-${dd}`;
+    dateOfBirth = new Date(yyyy, defaultDOB.getMonth(), defaultDOB.getDate());
+
+    function updateDateDisplay() {
+      const now = new Date();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+      currentDateEl.textContent = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+
+      const age = (now - dateOfBirth) / (1000 * 60 * 60 * 24 * 365.25);
+      const yearDisplay = Math.floor(age);
+      currentYearEl.textContent = `Year ${yearDisplay} of ${totalYears}`;
+    }
+
+    function openJournal() {
+      const now = new Date();
+      const key = now.toISOString().split('T')[0];
+
+      journalDateEl.textContent = `${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`;
+
+      const age = (now - dateOfBirth) / (1000 * 60 * 60 * 24 * 365.25);
+      const yearDisplay = Math.floor(age);
+      const yearProgress = age - yearDisplay;
+      const dayOfYear = Math.floor(yearProgress * 365.25);
+      journalYearBadgeEl.textContent = `Year ${yearDisplay}, Day ${dayOfYear + 1}`;
+
+      journalTextarea.value = journalEntries[key] || '';
+      charCountEl.textContent = `${journalTextarea.value.length} characters`;
+
+      journalPanel.classList.add('active');
+      journalOverlay.classList.add('active');
+      journalTextarea.focus();
+    }
+
+    function closeJournal() {
+      journalPanel.classList.remove('active');
+      journalOverlay.classList.remove('active');
+    }
+
+    journalTextarea.addEventListener('input', () => {
+      charCountEl.textContent = `${journalTextarea.value.length} characters`;
+    });
+
+    document.getElementById('journalSave').addEventListener('click', () => {
+      const now = new Date();
+      const key = now.toISOString().split('T')[0];
+      journalEntries[key] = journalTextarea.value;
+      closeJournal();
+    });
+
+    document.getElementById('journalCancel').addEventListener('click', closeJournal);
+    journalOverlay.addEventListener('click', closeJournal);
+
+    // Settings Toggle
+    let settingsOpen = false;
+    settingsBtn.addEventListener('click', () => {
+      settingsOpen = !settingsOpen;
+      settingsPanel.classList.toggle('active', settingsOpen);
+      settingsOverlay.classList.toggle('active', settingsOpen);
+    });
+
+    settingsOverlay.addEventListener('click', () => {
+      settingsOpen = false;
+      settingsPanel.classList.remove('active');
+      settingsOverlay.classList.remove('active');
+    });
+
+    // DOB Input
+    dobInput.addEventListener('change', (e) => {
+      const parts = e.target.value.split('-');
+      if (parts.length === 3) {
+        dateOfBirth = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+        generateSpiral();
+        updateSpiralPosition();
+      }
+    });
+
+    // Sun Size
+    const sunSizeInput = document.getElementById('sunSize');
+    const sunSizeVal = document.getElementById('sunSizeVal');
+    sunSizeInput.addEventListener('input', (e) => {
+      sunScale = parseFloat(e.target.value);
+      sunSizeVal.textContent = sunScale.toFixed(1);
+      sunMesh.scale.setScalar(sunScale);
+      glowMesh.scale.setScalar(sunScale * 1.8 / 2.5);
+      glowMesh2.scale.setScalar(sunScale * 3 / 2.5);
+    });
+
+    // Earth Size
+    const earthSizeInput = document.getElementById('earthSize');
+    const earthSizeVal = document.getElementById('earthSizeVal');
+    earthSizeInput.addEventListener('input', (e) => {
+      earthScale = parseFloat(e.target.value);
+      earthSizeVal.textContent = earthScale.toFixed(1);
+      earthMesh.scale.setScalar(earthScale);
+      atmosMesh.scale.setScalar(earthScale);
+      earthTexturedMesh.scale.setScalar(earthScale);
+    });
+
+    // Moon Size
+    const moonSizeInput = document.getElementById('moonSize');
+    const moonSizeVal = document.getElementById('moonSizeVal');
+    moonSizeInput.addEventListener('input', (e) => {
+      moonScale = parseFloat(e.target.value);
+      moonSizeVal.textContent = moonScale.toFixed(1);
+      moonMesh.scale.setScalar(moonScale);
+    });
+
+    // Toggle Stars
+    const toggleStars = document.getElementById('toggleStars');
+    toggleStars.addEventListener('click', () => {
+      showStars = !showStars;
+      toggleStars.classList.toggle('active', showStars);
+      starField.visible = showStars;
+    });
+
+    // Toggle Orbit
+    const toggleOrbit = document.getElementById('toggleOrbit');
+    toggleOrbit.addEventListener('click', () => {
+      showOrbit = !showOrbit;
+      toggleOrbit.classList.toggle('active', showOrbit);
+      spiralLine.visible = showOrbit;
+      currentSpiralMarker.visible = showOrbit;
+    });
+
+    // Toggle Glow
+    const toggleGlow = document.getElementById('toggleGlow');
+    toggleGlow.addEventListener('click', () => {
+      showGlow = !showGlow;
+      toggleGlow.classList.toggle('active', showGlow);
+      sunGroup.children.forEach(child => {
+        if (child.material && child.material.transparent) {
+          child.visible = showGlow;
+        }
+      });
+    });
+
+    // ===== ANIMATION =====
+    let time = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      time += 0.016;
+
+      // Smooth camera
+      if (autoRotate) {
+        targetAngle.theta += 0.001;
+      }
+
+      cameraAngle.theta += (targetAngle.theta - cameraAngle.theta) * 0.05;
+      cameraAngle.phi += (targetAngle.phi - cameraAngle.phi) * 0.05;
+
+      camera.position.x = cameraRadius * Math.sin(cameraAngle.phi) * Math.sin(cameraAngle.theta);
+      camera.position.y = cameraRadius * Math.cos(cameraAngle.phi);
+      camera.position.z = cameraRadius * Math.sin(cameraAngle.phi) * Math.cos(cameraAngle.theta);
+      camera.lookAt(0, 0, 0);
+
+      // Sun rotation
+      sunMesh.rotation.y += 0.002;
+
+      // Earth orbit
+      const ageInYears = (Date.now() - dateOfBirth.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      const yearProgress = Math.min(ageInYears, totalYears);
+      const t = yearProgress / totalYears;
+
+      const spiralIndex = Math.floor(t * (spiralPoints.length - 1));
+      const currentPos = spiralPoints[Math.min(spiralIndex, spiralPoints.length - 1)];
+      
+      earthGroup.position.copy(currentPos);
+      
+      // Earth tilt and rotation
+      earthMesh.rotation.y += 0.01;
+      earthTexturedMesh.rotation.y += 0.01;
+      earthGroup.rotation.z = Math.PI / 23.5; // ~23.5 degree tilt
+
+      // Moon orbit around earth
+      const moonAngle = time * 0.5;
+      const moonDist = 1.2 * earthScale;
+      moonMesh.position.x = Math.cos(moonAngle) * moonDist;
+      moonMesh.position.z = Math.sin(moonAngle) * moonDist;
+      moonMesh.position.y = Math.sin(moonAngle * 0.3) * 0.3 * earthScale;
+
+      // Rotate star field slowly
+      starField.rotation.y += 0.0001;
+      starField.rotation.x += 0.00005;
+
+      // Update spiral marker
+      updateSpiralPosition();
+
+      // Update date display every 60 seconds
+      if (Math.floor(time) !== Math.floor(time - 0.016)) {
+        updateDateDisplay();
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // ===== RESIZE =====
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Initial date display
+    updateDateDisplay();
+
+    // Start animation
+    animate();
+
+    // ===== SERVICE WORKER FOR PERSISTENCE (Optional) =====
+    if ('serviceWorker' in navigator) {
+      // Could add a service worker here for offline journal persistence
+    }
+
+  })();
+  </script>
+</body>
+</html>
